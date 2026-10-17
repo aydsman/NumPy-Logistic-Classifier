@@ -32,7 +32,7 @@ The classes are two Gaussian clouds that overlap slightly, so a few training poi
 
 ## How it works
 
-Each point has two features, $x = (x_1, x_2)$, and a label $y \in \{0, 1\}$.
+Each point has two features, $x = (x_1, x_2)$, and a label $y \in \lbrace 0, 1 \rbrace$.
 
 **1. Linear score:** a weighted sum of the features plus a bias:
 
