@@ -13,6 +13,17 @@ DEFAULT_SPEED = 10
 COLOR_0 = "tab:blue"
 COLOR_1 = "tab:orange"
 
+LIGHT_THEME = {
+    "bg": "#f0f0f0", "fg": "black", "button": "#e1e1e1", "button_active": "#d0d0d0",
+    "field": "white", "trough": "#c8c8c8", "figure": "white", "axes": "white",
+    "grid": "#b0b0b0", "line": "black",
+}
+DARK_THEME = {
+    "bg": "#1e1e1e", "fg": "white", "button": "#333333", "button_active": "#454545",
+    "field": "#2b2b2b", "trough": "#3a3a3a", "figure": "#1e1e1e", "axes": "#121212",
+    "grid": "#505050", "line": "white",
+}
+
 
 def boundary_points(w, b, xlim, ylim):
     """Two endpoints of the line w1*x1 + w2*x2 + b = 0, or None if there is no line yet."""
@@ -39,6 +50,8 @@ class TrainingApp:
 
         self.running = False
         self.showing_loss = False
+        self.dark_mode = False
+        self.theme = LIGHT_THEME
         self.pending_epochs = 0.0
         self.last_tick = time.perf_counter()
 
@@ -47,6 +60,7 @@ class TrainingApp:
         self._build_loss_screen()
         self.dots_frame.pack(fill=tk.BOTH, expand=True)
 
+        self.apply_theme()
         self.reset()
         self.root.after(TICK_MS, self.tick)
 
@@ -71,6 +85,8 @@ class TrainingApp:
         self.screen_button = tk.Button(bar, text="Show loss graph", width=16,
                                        command=self.toggle_screen)
         self.screen_button.pack(side=tk.RIGHT, padx=2)
+        self.theme_button = tk.Button(bar, text="Dark mode", width=10, command=self.toggle_theme)
+        self.theme_button.pack(side=tk.RIGHT, padx=2)
 
         self.status = tk.Label(self.root, anchor="w", padx=10, font=("Consolas", 10))
         self.status.pack(fill=tk.X)
@@ -98,8 +114,8 @@ class TrainingApp:
         ax.set_xlabel("x1")
         ax.set_ylabel("x2")
 
-        self.boundary_line, = ax.plot([], [], "k--", linewidth=2, label="decision boundary")
-        ax.legend(loc="lower right", fontsize=8)
+        self.boundary_line, = ax.plot([], [], "--", linewidth=2, label="decision boundary")
+        self.dots_legend = ax.legend(loc="lower right", fontsize=8)
 
         self.dots_canvas = FigureCanvasTkAgg(self.dots_fig, master=self.dots_frame)
         self.dots_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -115,7 +131,6 @@ class TrainingApp:
         ax.set_xlabel("Epoch")
         ax.set_ylabel("Training loss (BCE)")
         ax.set_title("Loss curve")
-        ax.grid(alpha=0.3)
 
         self.loss_canvas = FigureCanvasTkAgg(self.loss_fig, master=self.loss_frame)
         self.loss_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
@@ -182,6 +197,58 @@ class TrainingApp:
 
     # ---------- Drawing ----------
 
+    def toggle_theme(self):
+        self.dark_mode = not self.dark_mode
+        self.theme = DARK_THEME if self.dark_mode else LIGHT_THEME
+        self.theme_button.config(text="Light mode" if self.dark_mode else "Dark mode")
+        self.apply_theme()
+        self.redraw()
+
+    def apply_theme(self):
+        t = self.theme
+        self.root.config(bg=t["bg"])
+        self._style_widget(self.root, t)
+
+        for fig, ax in ((self.dots_fig, self.dots_ax), (self.loss_fig, self.loss_ax)):
+            fig.set_facecolor(t["figure"])
+            ax.set_facecolor(t["axes"])
+            ax.tick_params(colors=t["fg"])
+            ax.xaxis.label.set_color(t["fg"])
+            ax.yaxis.label.set_color(t["fg"])
+            ax.title.set_color(t["fg"])
+            for spine in ax.spines.values():
+                spine.set_edgecolor(t["fg"])
+
+        self.loss_ax.grid(True, color=t["grid"], alpha=0.6)
+        self.boundary_line.set_color(t["line"])
+        self.dots_legend.get_frame().set_facecolor(t["axes"])
+        self.dots_legend.get_frame().set_edgecolor(t["grid"])
+        for text in self.dots_legend.get_texts():
+            text.set_color(t["fg"])
+        # The legend caches its line sample, so it needs the new boundary color too
+        self.dots_legend.get_lines()[-1].set_color(t["line"])
+
+        self.dots_canvas.draw_idle()
+        self.loss_canvas.draw_idle()
+
+    def _style_widget(self, widget, t):
+        kind = widget.winfo_class()
+        if kind == "Button":
+            widget.config(bg=t["button"], fg=t["fg"], activebackground=t["button_active"],
+                          activeforeground=t["fg"])
+        elif kind == "Label":
+            widget.config(bg=t["bg"], fg=t["fg"])
+        elif kind == "Scale":
+            widget.config(bg=t["bg"], fg=t["fg"], troughcolor=t["trough"],
+                          activebackground=t["button_active"], highlightbackground=t["bg"])
+        elif kind == "Spinbox":
+            widget.config(bg=t["field"], fg=t["fg"], insertbackground=t["fg"],
+                          buttonbackground=t["button"], highlightbackground=t["bg"])
+        elif kind in ("Frame", "Canvas"):
+            widget.config(bg=t["bg"], highlightbackground=t["bg"])
+        for child in widget.winfo_children():
+            self._style_widget(child, t)
+
     def toggle_screen(self):
         self.showing_loss = not self.showing_loss
         if self.showing_loss:
@@ -212,7 +279,8 @@ class TrainingApp:
         else:
             pts = boundary_points(self.w, self.b, self.xlim, self.ylim)
             self.boundary_line.set_data(*(pts if pts else ([], [])))
-            self.dots_ax.set_title(f"Epoch {self.epoch}  (filled = train, hollow = test)")
+            self.dots_ax.set_title(f"Epoch {self.epoch}  (filled = train, hollow = test)",
+                                   color=self.theme["fg"])
             self.dots_canvas.draw_idle()
 
 

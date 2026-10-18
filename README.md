@@ -100,6 +100,7 @@ python visualize.py
 | **Reset** | Set the weights back to zero |
 | **Speed** | Epochs per second (1–200), set with the slider or by typing a value |
 | **Show loss graph** | Switch to the live loss curve and back; training continues on either screen |
+| **Dark mode** | Toggle between the light and dark themes |
 
 ## Configuration
 
